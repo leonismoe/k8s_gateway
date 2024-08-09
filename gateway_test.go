@@ -235,6 +235,34 @@ var tests = []test.Case{
 			test.A("dns1.kube-system.example.com.	60	IN	A	192.0.1.53"),
 		},
 	},
+	// Ingress does not exist, but there's a wildcard record with its extension | Test 18
+	{
+		Qname: "wild.example.com.", Qtype: dns.TypeA, Rcode: dns.RcodeNameError,
+		Ns: []dns.RR{
+			test.SOA("example.com.	60	IN	SOA	dns1.kube-system.example.com. hostmaster.example.com. 1499347823 7200 1800 86400 5"),
+		},
+	},
+	// Existing wildcard A record | Test 19
+	{
+		Qname: "b.wild.example.com.", Qtype: dns.TypeA, Rcode: dns.RcodeSuccess,
+		Answer: []dns.RR{
+			test.A("b.wild.example.com.	60	IN	A	192.0.0.7"),
+		},
+	},
+	// Existing Ingress A record and matched wildcard record | Test 20
+	{
+		Qname: "ns1.wild.example.com.", Qtype: dns.TypeA, Rcode: dns.RcodeSuccess,
+		Answer: []dns.RR{
+			test.A("ns1.wild.example.com.	60	IN	A	192.0.0.6"),
+		},
+	},
+	// Existing Ingress A record and matched wildcard record | Test 21
+	{
+		Qname: "ns2.wild.example.com.", Qtype: dns.TypeA, Rcode: dns.RcodeSuccess,
+		Answer: []dns.RR{
+			test.A("ns2.wild.example.com.	60	IN	A	192.0.0.8"),
+		},
+	},
 }
 
 var testsFallthrough = []FallthroughCase{
@@ -285,6 +313,9 @@ var testIngressIndexes = map[string][]netip.Addr{
 	"example.com":           {netip.MustParseAddr("192.0.0.3")},
 	"shadow.example.com":    {netip.MustParseAddr("192.0.0.4")},
 	"shadow-vs.example.com": {netip.MustParseAddr("192.0.0.5")},
+	"ns1.wild.example.com":  {netip.MustParseAddr("192.0.0.6")},
+	"*.wild.example.com":    {netip.MustParseAddr("192.0.0.7")},
+	"ns2.wild.example.com":  {netip.MustParseAddr("192.0.0.8")},
 }
 
 func testIngressLookup(keys []string) (results []netip.Addr) {

@@ -126,11 +126,21 @@ func (gw *Gateway) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 
 	// Computing keys to look up in cache
 	var indexKeys []string
+	var wildcardKeys []string
 	strippedQName := stripClosingDot(state.QName())
+	wildcardQName := getWildcardName(strippedQName)
 	if len(zonelessQuery) != 0 && zonelessQuery != strippedQName {
 		indexKeys = []string{strippedQName, zonelessQuery}
+
+		zonelessWildcard := getWildcardName(zonelessQuery)
+		if len(zonelessWildcard) > 0 {
+			wildcardKeys = []string{wildcardQName, zonelessWildcard}
+		} else {
+			wildcardKeys = []string{wildcardQName}
+		}
 	} else {
 		indexKeys = []string{strippedQName}
+		wildcardKeys = []string{wildcardQName}
 	}
 	log.Debugf("Computed Index Keys %v", indexKeys)
 
@@ -162,6 +172,17 @@ func (gw *Gateway) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 			break
 		}
 	}
+
+	// If no exact matches found, search for wildcard
+	if len(addrs) == 0 {
+		for _, resource := range gw.Resources {
+			addrs = resource.lookup(wildcardKeys)
+			if len(addrs) > 0 {
+				break
+			}
+		}
+	}
+
 	log.Debugf("Computed response addresses %v", addrs)
 
 	// Fall through if no host matches
@@ -282,7 +303,6 @@ func (gw *Gateway) AAAA(name string, results []netip.Addr) (records []dns.RR) {
 
 // SelfAddress returns the address of the local k8s_gateway service
 func (gw *Gateway) SelfAddress(state request.Request) (records []dns.RR) {
-
 	var addrs1, addrs2 []netip.Addr
 	for _, resource := range gw.Resources {
 		results := resource.lookup([]string{gw.apex})
@@ -302,7 +322,16 @@ func (gw *Gateway) SelfAddress(state request.Request) (records []dns.RR) {
 	}
 
 	return records
-	//return records
+}
+
+func getWildcardName(domain string) string {
+	if !strings.HasPrefix(domain, "*") {
+		i := strings.Index(domain, ".")
+		if i > -1 && len(domain) > i + 1 {
+			return "*" + domain[i:]
+		}
+	}
+	return ""
 }
 
 // Strips the zone from FQDN and return a hostname
